@@ -95,6 +95,7 @@ void GLRenderer::initializeGL()
 
     // Task 1: call ShaderLoader::createShaderProgram with the paths to the vertex
     //         and fragment shaders. Then, store its return value in `m_shader`
+    m_shader = ShaderLoader::createShaderProgram(":/resources/shaders/default.vert", ":/resources/shaders/default.frag");
 
     // Generate and bind VBO
     glGenBuffers(1, &m_sphere_vbo);
@@ -124,16 +125,37 @@ void GLRenderer::paintGL()
     glBindVertexArray(m_sphere_vao);
 
     // Task 2: activate the shader program by calling glUseProgram with `m_shader`
+    glUseProgram(m_shader);
 
     // Task 6: pass in m_model as a uniform into the shader program
+    GLuint m_model_location = glGetUniformLocation(m_shader, "m_model");
+    glUniformMatrix4fv(m_model_location, 1, GL_FALSE, &m_model[0][0]);
 
     // Task 7: pass in m_view and m_proj
+    GLuint m_view_location = glGetUniformLocation(m_shader, "m_view");
+    glUniformMatrix4fv(m_view_location, 1, GL_FALSE, &m_view[0][0]);
+    GLuint m_proj_location = glGetUniformLocation(m_shader, "m_proj");
+    glUniformMatrix4fv(m_proj_location, 1, GL_FALSE, &m_proj[0][0]);
 
     // Task 12: pass m_ka into the fragment shader as a uniform
+    GLuint m_ka_location = glGetUniformLocation(m_shader, "k_a");
+    glUniform1f(m_ka_location, m_ka);
 
     // Task 13: pass light position and m_kd into the fragment shader as a uniform
+    GLuint m_kd_location = glGetUniformLocation(m_shader, "k_d");
+    glUniform1f(m_kd_location, m_kd);
+    GLuint light_pos_location = glGetUniformLocation(m_shader, "light_world_pos");
+    glUniform4fv(light_pos_location, 1, &m_lightPos[0]);
 
     // Task 14: pass shininess, m_ks, and world-space camera position
+    GLuint m_ks_location = glGetUniformLocation(m_shader, "k_s");
+    glUniform1f(m_ks_location, m_ks);
+    GLuint m_shininess_location = glGetUniformLocation(m_shader, "shininess");
+    glUniform1f(m_shininess_location, m_shininess);
+
+    glm::vec3 camPosWorld = glm::vec3(glm::inverse(m_view) * glm::vec4(0,0,0,1));
+    GLuint camera_pos_location = glGetUniformLocation(m_shader, "world_space_cam_pos");
+    glUniform4fv(camera_pos_location, 1, &camPosWorld[0]);
 
     // Draw Command
     glDrawArrays(GL_TRIANGLES, 0, m_sphereData.size() / 3);
@@ -141,6 +163,7 @@ void GLRenderer::paintGL()
     glBindVertexArray(0);
 
     // Task 3: deactivate the shader program by passing 0 into glUseProgram
+    glUseProgram(0);
 }
 
 // ================== Other stencil code
