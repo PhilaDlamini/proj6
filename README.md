@@ -1,3 +1,3 @@
-# Lab 10: Shaders
+# Project 6: 
 
-Welcome to Lab 10! The handout for the lab is located [here](https:// browncsci1230.github.io/labs/lab10).
+For project 6 features I decided to implement ray marching and HDR rendering. See submission.md for more details
