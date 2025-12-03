@@ -10,11 +10,10 @@
 
 GLRenderer::GLRenderer(QWidget *parent)
     : QOpenGLWidget(parent),
-      m_lightPos(10,0,0,1),
       m_ka(0.1),
       m_kd(0.8),
       m_ks(1),
-      m_shininess(15),
+      m_shininess(15.f),
       m_angleX(6),
       m_angleY(0),
       m_zoom(2)
@@ -28,145 +27,113 @@ GLRenderer::~GLRenderer()
     doneCurrent();
 }
 
-// ================== Helper Functions
-
-glm::vec4 sphericalToCartesian(float phi, float theta)
-{
-    return glm::vec4(glm::cos(theta) * glm::sin(phi),
-                     glm::sin(theta) * glm::sin(phi),
-                     glm::cos(phi),1);
-}
-
-void pushVec3(glm::vec4 vec, std::vector<float>* data)
-{
-    data->push_back(vec.x);
-    data->push_back(vec.y);
-    data->push_back(vec.z);
-}
-
-std::vector<float> generateSphereData(int phiTesselations, int thetaTesselations)
-{
-    std::vector<float> data;
-
-    data.clear();
-    data.reserve(phiTesselations * thetaTesselations * 6 * 3);
-
-    for(int iTheta = 0; iTheta < thetaTesselations; iTheta++) {
-        for(int iPhi = 0; iPhi < phiTesselations; iPhi++) {
-            float phi1 = 1.0  * iPhi / phiTesselations * glm::pi<float>();
-            float phi2 = 1.0  * (iPhi + 1) / phiTesselations * glm::pi<float>();
-
-            float the1 = 1.0 * iTheta / thetaTesselations * 2 * glm::pi<float>();
-            float the2 = 1.0 * (iTheta + 1) / thetaTesselations * 2 * glm::pi<float>();
-
-            glm::vec4 p1 = sphericalToCartesian(phi1,the1);
-            glm::vec4 p2 = sphericalToCartesian(phi2,the1);
-            glm::vec4 p3 = sphericalToCartesian(phi2,the2);
-            glm::vec4 p4 = sphericalToCartesian(phi1,the2);
-
-            pushVec3(p1,&data);
-            pushVec3(p2,&data);
-            pushVec3(p3,&data);
-
-            pushVec3(p1,&data);
-            pushVec3(p3,&data);
-            pushVec3(p4,&data);
-        }
-    }
-
-    return data;
-}
-
-// ================== Students, You'll Be Working In These Files
-
 void GLRenderer::initializeGL()
 {
-    // Initialize GL extension wrangler
     glewExperimental = GL_TRUE;
     GLenum err = glewInit();
     if (err != GLEW_OK) fprintf(stderr, "Error while initializing GLEW: %s\n", glewGetErrorString(err));
     fprintf(stdout, "Successfully initialized GLEW %s\n", glewGetString(GLEW_VERSION));
 
-    // Set clear color to black
     glClearColor(0,0,0,1);
+    glDisable(GL_DEPTH_TEST);
+    m_shader = ShaderLoader::createShaderProgram(":/resources/shaders/default.vert",":/resources/shaders/default.frag");
 
-    // Enable depth testing
-    glEnable(GL_DEPTH_TEST);
+    //Fullscreen Quad
+    float quadVertices[] = {
+        // pos      // uv
+        -1, -1,     0, 0,
+        1, -1,     1, 0,
+        -1,  1,     0, 1,
 
-    // Task 1: call ShaderLoader::createShaderProgram with the paths to the vertex
-    //         and fragment shaders. Then, store its return value in `m_shader`
-    m_shader = ShaderLoader::createShaderProgram(":/resources/shaders/default.vert", ":/resources/shaders/default.frag");
+        -1,  1,     0, 1,
+        1, -1,     1, 0,
+        1,  1,     1, 1
+    };
 
-    // Generate and bind VBO
-    glGenBuffers(1, &m_sphere_vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, m_sphere_vbo);
-    // Generate sphere data
-    m_sphereData = generateSphereData(10,20);
-    // Send data to VBO
-    glBufferData(GL_ARRAY_BUFFER,m_sphereData.size() * sizeof(GLfloat),m_sphereData.data(), GL_STATIC_DRAW);
-    // Generate, and bind vao
-    glGenVertexArrays(1, &m_sphere_vao);
-    glBindVertexArray(m_sphere_vao);
+    glGenVertexArrays(1, &m_quadVAO);
+    glGenBuffers(1, &m_quadVBO);
 
-    // Enable and define attribute 0 to store vertex positions
+    glBindVertexArray(m_quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, m_quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+
+    // position
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3 * sizeof(GLfloat),reinterpret_cast<void *>(0));
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)0);
 
-    // Clean-up bindings
+    // uv
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2*sizeof(float)));
+
     glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER,0);
 }
 
 void GLRenderer::paintGL()
 {
-    // Clear screen color and depth before painting
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    // Bind Sphere Vertex Data
-    glBindVertexArray(m_sphere_vao);
+    glClear(GL_COLOR_BUFFER_BIT);
 
-    // Task 2: activate the shader program by calling glUseProgram with `m_shader`
     glUseProgram(m_shader);
 
-    // Task 6: pass in m_model as a uniform into the shader program
-    GLuint m_model_location = glGetUniformLocation(m_shader, "m_model");
-    glUniformMatrix4fv(m_model_location, 1, GL_FALSE, &m_model[0][0]);
+    //Upload shape information
+    int shape = 4;
+    float shapeZoomMultiplier = 1.0f;
+    glUniform1i(glGetUniformLocation(m_shader, "uShape"), shape);
 
-    // Task 7: pass in m_view and m_proj
-    GLuint m_view_location = glGetUniformLocation(m_shader, "m_view");
-    glUniformMatrix4fv(m_view_location, 1, GL_FALSE, &m_view[0][0]);
-    GLuint m_proj_location = glGetUniformLocation(m_shader, "m_proj");
-    glUniformMatrix4fv(m_proj_location, 1, GL_FALSE, &m_proj[0][0]);
+    // Adjust camera distance per-shape
+    switch(shape) {
+        case 1:
+            shapeZoomMultiplier = 1.4f; // Menger Sponge
+            break;
 
-    // Task 12: pass m_ka into the fragment shader as a uniform
-    GLuint m_ka_location = glGetUniformLocation(m_shader, "k_a");
-    glUniform1f(m_ka_location, m_ka);
+        case 3:
+            m_view = glm::lookAt(glm::vec3(0.0f, 5.0f, -10.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            shapeZoomMultiplier = 3.f;
+            break;
 
-    // Task 13: pass light position and m_kd into the fragment shader as a uniform
-    GLuint m_kd_location = glGetUniformLocation(m_shader, "k_d");
-    glUniform1f(m_kd_location, m_kd);
-    GLuint light_pos_location = glGetUniformLocation(m_shader, "light_world_pos");
-    glUniform4fv(light_pos_location, 1, &m_lightPos[0]);
+        case 4:
+            shapeZoomMultiplier = 2.5f;
+            break;
+    }
 
-    // Task 14: pass shininess, m_ks, and world-space camera position
-    GLuint m_ks_location = glGetUniformLocation(m_shader, "k_s");
-    glUniform1f(m_ks_location, m_ks);
-    GLuint m_shininess_location = glGetUniformLocation(m_shader, "shininess");
-    glUniform1f(m_shininess_location, m_shininess);
+    // Upload camera uniforms
+    GLuint locView = glGetUniformLocation(m_shader, "uView");
+    glUniformMatrix4fv(locView, 1, GL_FALSE, &m_view[0][0]);
 
-    glm::vec3 camPosWorld = glm::vec3(glm::inverse(m_view) * glm::vec4(0,0,0,1));
-    GLuint camera_pos_location = glGetUniformLocation(m_shader, "world_space_cam_pos");
-    glUniform4fv(camera_pos_location, 1, &camPosWorld[0]);
+    GLuint locProj = glGetUniformLocation(m_shader, "uProj");
+    glUniformMatrix4fv(locProj, 1, GL_FALSE, &m_proj[0][0]);
 
-    // Draw Command
-    glDrawArrays(GL_TRIANGLES, 0, m_sphereData.size() / 3);
-    // Unbind Vertex Array
+    // Upload camera pos for shaders
+    glm::vec3 camPos = glm::vec3(glm::inverse(m_view) * glm::vec4(0,0,0,1));
+    camPos *= shapeZoomMultiplier;
+    GLuint locCam = glGetUniformLocation(m_shader, "uCameraPos");
+    glUniform3fv(locCam, 1, &camPos[0]);
+
+    //Upload lights
+    glUniform1i(glGetUniformLocation(m_shader, "numLights"), lights.size());
+
+    for(int i=0; i<lights.size(); i++) {
+        std::string posName = "lights[" + std::to_string(i) + "].position";
+        std::string colName = "lights[" + std::to_string(i) + "].color";
+        glUniform3fv(glGetUniformLocation(m_shader, posName.c_str()), 1, &lights[i].position[0]);
+        glUniform3fv(glGetUniformLocation(m_shader, colName.c_str()), 1, &lights[i].color[0]);
+    }
+
+    // with material coefficients
+    glUniform1f(glGetUniformLocation(m_shader,"ka"), m_ka);
+    glUniform1f(glGetUniformLocation(m_shader,"kd"), m_kd);
+    glUniform1f(glGetUniformLocation(m_shader,"ks"), m_ks);
+    glUniform1f(glGetUniformLocation(m_shader,"shininess"), m_shininess);
+
+    // and HDR toggle information
+    glUniform1i(glGetUniformLocation(m_shader,"useHDR"), false);
+
+
+    glBindVertexArray(m_quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
-
-    // Task 3: deactivate the shader program by passing 0 into glUseProgram
     glUseProgram(0);
 }
 
-// ================== Other stencil code
 
 void GLRenderer::resizeGL(int w, int h)
 {

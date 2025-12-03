@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 # Sets project name
-project(lab10 LANGUAGES CXX C)
+project(proj6 LANGUAGES CXX C)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOUIC ON)
@@ -31,6 +31,7 @@ add_executable(${PROJECT_NAME}
     src/glrenderer.h
     src/mainwindow.h
     src/shaderloader.h
+    src/light.h
 )
 # Specifies other files
 qt_add_resources(${PROJECT_NAME} "Resources"
