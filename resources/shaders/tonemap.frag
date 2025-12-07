@@ -5,11 +5,15 @@ out vec4 fragColor;
 uniform sampler2D uHDRTexture;
 
 vec3 tonemap(vec3 x) {
-    return x / (1.0 + x); //Reinhard operator
+    float exposure = 1.2;
+    x *= exposure; //Brighten up exposure
+    x = x / (1.0 + x); // Reinhard
+    x = pow(x, vec3(0.95));      // subtle gamma
+    return x;
 }
 
 void main() {
     vec3 hdr = texture(uHDRTexture, UV).rgb;
     vec3 ldr = tonemap(hdr);
-    fragColor = vec4(ldr, 1.0);
+    fragColor = vec4(hdr, 1.0);
 }

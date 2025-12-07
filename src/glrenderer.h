@@ -42,12 +42,42 @@ private:
     glm::mat4 m_view  = glm::mat4(1);
     glm::mat4 m_proj  = glm::mat4(1);
 
-    std::vector<Light> lights= {
-        { {-5,  5,  5}, {0.9, 0.5, 0.2}},   // warm orange key
-        { { 5,  4, -3}, {0.2, 0.4, 1.3}},   // cool blue fill
-        { { 0, -3,  6}, {1.6, 1.6, 1.6}},   // soft white bounce
-        { { 0,  6,  0}, {0.3, 1.5, 0.3}}    // subtle green rim
+    std::vector<SceneLightData> lights = {
+        // Warm key light — front-right
+        {
+            1, // point
+            {1.0f, 0.85f, 0.7f},
+            {1.0f, 0.045f, 0.0075f},
+            glm::vec4(0.0f, 1.0f, 3.0f, 1.0f),
+            {0,0,0,0},
+            0.f,
+            0.f
+        },
+
+        // Cool fill light — left-back
+        {
+            1, // point
+            {0.4f, 0.7f, 1.0f},
+            {1.0f, 0.045f, 0.0075f},
+            glm::vec4(3.0f, -2.0f, 3.0f, 1.0f),
+            {0,0,0,0},
+            0.f,
+            0.f
+        },
+
+        // Soft directional rim light — top-back
+        {
+            0, // directional
+            {0., 0.4f, 0.4f},
+            {1.0f, 0.0f, 0.0f},
+            {0,0,0,0},
+            glm::normalize(glm::vec4(0.3f, -1.0f, 0.5f, 0.0f)),
+            0.f,
+            0.f
+        }
     };
+
+
 
 
     float m_ka;

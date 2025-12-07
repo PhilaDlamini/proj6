@@ -4,22 +4,34 @@ out vec4 fragColor;
 uniform mat4 uView;
 uniform mat4 uProj;
 uniform vec3 uCameraPos;
-uniform int uShape; //Which scene to render: One of 0 = Mandelbulb, 1 = Menger Sponge, 2 = Julia Quaternion, 3 = Terrain, 4 = Sphere/Torus combo
+uniform int uShape; //Which shape to render: One of 0 = Mandelbulb, 1 = Menger Sponge, 2 = Julia Quaternion, 3 = Terrain, 4 = Sphere/Torus combo
 
-struct Light {
-    vec3 position;
-    vec3 color; // can exceed 1.0 for HDR
+struct SceneLightData {
+    int type;          // 0 = Directional, 1 = Point, 2 = Spot
+    vec3 color;        // Light color (RG). Can exceed 1.0 for HDR
+    vec3 function;     // Attenuation: constant, linear, quadratic
+    vec4 pos;          // World-space position (point/spot)
+    vec4 dir;          // World-space direction (directional/spot)
+    float penumbra;    // Spot penumbra (radians)
+    float angle;       // Spot angle (radians)
 };
 
-const int MAX_LIGHTS = 4;
-uniform Light lights[MAX_LIGHTS];
+const int MAX_LIGHTS = 8;
+uniform SceneLightData lights[MAX_LIGHTS];
 uniform int numLights;
 
 // Material coefficients
 uniform float ka; // ambient
 uniform float kd; // diffuse
 uniform float ks; // specular
-uniform float shininess;
+
+// Material properties
+uniform vec3 mat_ambient;
+uniform vec3 mat_diffuse;
+uniform vec3 mat_specular;
+uniform float mat_shininess;
+
+//////////// Fractal SDF definitions ////////////////
 
 // Mandel buld fractral
 float mandelbulbDE(vec3 pos)
@@ -173,23 +185,57 @@ float marchRay(vec3 ro, vec3 rd, out vec3 hitPos, out int hit)
     return t;
 }
 
-// Phong lighting
-vec3 phongLighting(vec3 p, vec3 N, vec3 viewDir)
-{
-    vec3 color = vec3(0.0);
+vec3 computeLight(SceneLightData light, vec3 pos, vec3 normal) {
+    vec3 N = normalize(normal);
+    vec3 V = normalize(uCameraPos - pos);
+    vec3 L;
+    float attenuation = 1.0;
 
-    for (int i = 0; i < numLights; i++) {
-        vec3 L = normalize(lights[i].position - p);
-        vec3 R = reflect(-L, N);
+    if (light.type == 0) {
+        L = normalize(-light.dir.xyz);
+    } else {
+        L = normalize(light.pos.xyz - pos);
+        float dist = length(light.pos.xyz - pos);
 
-        float diff = max(dot(N, L), 0.0);
-        float spec = pow(max(dot(viewDir, R), 0.0), shininess);
+        attenuation = 1.0 / (light.function.x +
+                             light.function.y * dist +
+                             light.function.z * dist * dist);
 
-        color += lights[i].color * (kd * diff + ks * spec);
+        if (light.type == 2) {
+            float theta = dot(normalize(-L), normalize(light.dir.xyz));
+            float cosInner = cos(light.angle - light.penumbra);
+            float cosOuter = cos(light.angle);
+            float intensity = clamp((theta - cosOuter) / (cosInner - cosOuter),
+                                    0.0, 1.0);
+            attenuation *= intensity;
+        }
     }
 
-    // Ambient
-    color += ka * vec3(0.1);
+    // Diffuse
+    float diff = max(dot(N, L), 0.0);
+    vec3 diffuse = kd * diff * mat_diffuse;
+
+    // Specular
+    vec3 specular = vec3(0.0);
+    if(mat_shininess > 0.0) {
+        vec3 R = reflect(-L, N);
+        float spec = pow(max(dot(R, V), 0.0), mat_shininess);
+        specular = ks * spec * mat_specular;
+    }
+
+    return attenuation * light.color * (diffuse + specular);
+}
+
+// Phong lighting
+vec3 phongLighting(vec3 p, vec3 N)
+{
+    // Global ambient (independent of lights)
+    vec3 color = ka * mat_ambient;
+
+    // Add diffuse + spec per light
+    for (int i = 0; i < numLights; ++i) {
+        color += computeLight(lights[i], p, N);
+    }
 
     return color;
 }
@@ -214,8 +260,7 @@ void main() {
 
     if (hit == 1) {
         vec3 N = estimateNormal(hitPos);
-        vec3 viewDir = normalize(ro - hitPos);
-        vec3 color = phongLighting(hitPos, N, viewDir);
+        vec3 color = phongLighting(hitPos, N);
         fragColor = vec4(color, 1.0);
 
     } else {

@@ -11,10 +11,9 @@
 
 GLRenderer::GLRenderer(QWidget *parent)
     : QOpenGLWidget(parent),
-    m_ka(0.1f),
-    m_kd(0.8f),
-    m_ks(1.0f),
-    m_shininess(16.0f),
+    m_ka(0.15f),
+    m_kd(0.85f),
+    m_ks(1.2f),
     m_angleX(6),
     m_angleY(0),
     m_zoom(2.0f),
@@ -210,21 +209,33 @@ void GLRenderer::renderSceneHDR()
     camPos *= shapeZoomMultiplier;
     GLuint locCam = glGetUniformLocation(m_phong_shader, "uCameraPos");
     glUniform3fv(locCam, 1, &camPos[0]);
+    glUniform1i(glGetUniformLocation(m_phong_shader, "numLights"), (GLint)lights.size());
 
-    //Upload lights
-    glUniform1i(glGetUniformLocation(m_phong_shader, "numLights"), lights.size());
-
-    for(int i=0; i<lights.size(); i++) {
-        std::string posName = "lights[" + std::to_string(i) + "].position";
-        std::string colName = "lights[" + std::to_string(i) + "].color";
-        glUniform3fv(glGetUniformLocation(m_phong_shader, posName.c_str()), 1, &lights[i].position[0]);
-        glUniform3fv(glGetUniformLocation(m_phong_shader, colName.c_str()), 1, &lights[i].color[0]);
+    for (int i = 0; i < lights.size(); i++) {
+        std::string base = "lights[" + std::to_string(i) + "].";
+        glUniform1i(glGetUniformLocation(m_phong_shader, (base + "type").c_str()), lights[i].type);
+        glUniform3fv(glGetUniformLocation(m_phong_shader, (base + "color").c_str()), 1, &lights[i].color[0]);
+        glUniform3fv(glGetUniformLocation(m_phong_shader, (base + "function").c_str()), 1, &lights[i].function[0]);
+        glUniform4fv(glGetUniformLocation(m_phong_shader, (base + "pos").c_str()), 1, &lights[i].pos[0]);
+        glUniform4fv(glGetUniformLocation(m_phong_shader, (base + "dir").c_str()), 1, &lights[i].dir[0]);
+        glUniform1f(glGetUniformLocation(m_phong_shader, (base + "penumbra").c_str()), lights[i].penumbra);
+        glUniform1f(glGetUniformLocation(m_phong_shader, (base + "angle").c_str()),lights[i].angle);
     }
 
-    // with material coefficients
+    // with global coefficients
     glUniform1f(glGetUniformLocation(m_phong_shader,"ka"), m_ka);
     glUniform1f(glGetUniformLocation(m_phong_shader,"kd"), m_kd);
     glUniform1f(glGetUniformLocation(m_phong_shader,"ks"), m_ks);
+
+    //Write material coefficients
+    m_shininess = 32.f;                   // higher specular
+    glm::vec3 mat_ambient  = glm::vec3(0.15f, 0.25f, 0.35f);
+    glm::vec3 mat_diffuse  = glm::vec3(0.6f, 0.95f, 1.0f);
+    glm::vec3 mat_specular = glm::vec3(1.0f, 1.0f, 1.0f);
+
+    glUniform3fv(glGetUniformLocation(m_phong_shader, "mat_ambient"), 1, &mat_ambient[0]);
+    glUniform3fv(glGetUniformLocation(m_phong_shader, "mat_diffuse"), 1, &mat_diffuse[0]);
+    glUniform3fv(glGetUniformLocation(m_phong_shader, "mat_specular"), 1, &mat_specular[0]);
     glUniform1f(glGetUniformLocation(m_phong_shader,"shininess"), m_shininess);
 
 
