@@ -26,7 +26,7 @@ GLRenderer::GLRenderer(QWidget *parent)
     m_phong_shader(0),
     m_tonemap_shader(0)
 {
-    // initialize matrices / state
+    // initialize matrices
     rebuildMatrices();
 }
 
@@ -74,7 +74,7 @@ void GLRenderer::initializeGL()
     m_phong_shader   = ShaderLoader::createShaderProgram(":/resources/shaders/phong.vert",   ":/resources/shaders/phong.frag");
     m_tonemap_shader = ShaderLoader::createShaderProgram(":/resources/shaders/tonemap.vert",   ":/resources/shaders/tonemap.frag");
 
-    // Fullscreen quad (two triangles) - position XY, uv
+    // Fullscreen quad: position XY, uv
     float quadVertices[] = {
         // pos      // uv
         -1.0f, -1.0f,  0.0f, 0.0f,
@@ -112,7 +112,7 @@ void GLRenderer::initializeGL()
     // Set tonemap shader sampler once
     glUseProgram(m_tonemap_shader);
     GLint loc = glGetUniformLocation(m_tonemap_shader, "uHDRTexture");
-    if (loc >= 0) glUniform1i(loc, 0); // texture unit 0
+    if (loc >= 0) glUniform1i(loc, 0);
     glUseProgram(0);
 }
 
@@ -133,7 +133,7 @@ void GLRenderer::createHDRFramebuffer(int w, int h)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_screen_width, m_screen_height, 0, GL_RGBA, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // Optional: clamp to edge to avoid wrap seams
+    // Clamp to edge to avoid wrap seams
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -163,7 +163,7 @@ void GLRenderer::paintGL()
     // 1) Render scene into the HDR framebuffer using phong shader
     renderSceneHDR();
 
-    // 2) Tone-map (and optionally post-process) the HDR texture to the default framebuffer
+    // 2) Tone-map the HDR texture to the default framebuffer
     toneMapToScreen();
 }
 
@@ -174,7 +174,7 @@ void GLRenderer::renderSceneHDR()
     glViewport(0, 0, m_screen_width, m_screen_height);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Use phong shader (this shader should output HDR color in fragColor.rgb)
+    // Use phong shader
     glUseProgram(m_phong_shader);
 
     //Upload shape information
@@ -185,7 +185,7 @@ void GLRenderer::renderSceneHDR()
     // Adjust camera distance per-shape
     switch(shape) {
     case 1:
-        shapeZoomMultiplier = 1.4f; // Menger Sponge
+        shapeZoomMultiplier = 1.4f;
         break;
 
     case 3:
@@ -249,9 +249,6 @@ void GLRenderer::toneMapToScreen()
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_hdrColorTex);
 
-    // // optional: set tonemap params (exposure, gamma, method flag)
-    // GLint locExposure = glGetUniformLocation(m_tonemap_shader, "exposure");
-    // if (locExposure >= 0) glUniform1f(locExposure, 1.0f);
 
     // draw fullscreen quad
     glBindVertexArray(m_quadVAO);
@@ -276,7 +273,6 @@ void GLRenderer::resizeGL(int w, int h)
     m_proj = glm::perspective(glm::radians(45.0f), 1.0f * w / h, 0.01f, 100.0f);
 }
 
-// ------------------ Input + Camera ------------------
 
 void GLRenderer::mousePressEvent(QMouseEvent *event)
 {
