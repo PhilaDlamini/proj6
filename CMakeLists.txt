@@ -38,8 +38,10 @@ qt_add_resources(${PROJECT_NAME} "Resources"
   PREFIX
   "/"
   FILES
-  resources/shaders/default.vert
-  resources/shaders/default.frag
+  resources/shaders/phong.vert
+  resources/shaders/phong.frag
+  resources/shaders/tonemap.vert
+  resources/shaders/tonemap.frag
 )
 
 # GLEW: this creates its library and allows you to `#include "GL/glew.h"`

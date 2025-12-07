@@ -1,6 +1,4 @@
 #version 330 core
-
-
 in vec2 UV;
 out vec4 fragColor;
 uniform mat4 uView;
@@ -22,9 +20,6 @@ uniform float ka; // ambient
 uniform float kd; // diffuse
 uniform float ks; // specular
 uniform float shininess;
-
-// HDR toggle
-uniform bool useHDR;
 
 // Mandel buld fractral
 float mandelbulbDE(vec3 pos)
@@ -178,7 +173,7 @@ float marchRay(vec3 ro, vec3 rd, out vec3 hitPos, out int hit)
     return t;
 }
 
-// Phong lighting in HDR
+// Phong lighting
 vec3 phongLighting(vec3 p, vec3 N, vec3 viewDir)
 {
     vec3 color = vec3(0.0);
@@ -199,19 +194,8 @@ vec3 phongLighting(vec3 p, vec3 N, vec3 viewDir)
     return color;
 }
 
-// Tone mapping
-vec3 toneMap(vec3 hdrColor)
-{
-    if (useHDR) {
-        return hdrColor / (hdrColor + vec3(1.0)); // Simple Reinhard tone mapping
-    } else {
-        return clamp(hdrColor, 0.0, 1.0); //Non-HDR clamp
-    }
-}
 
-void main()
-{
-    // Remap uv coordiantes to normalized screen coordinates [(0, 0), (1, 1)] -> [(-1, -1), (1, 1)]
+void main() {
     vec2 uv = UV * 2.0 - 1.0;
     mat4 invProj = inverse(uProj); //inverse matrices
     mat4 invView = inverse(uView);
@@ -232,7 +216,7 @@ void main()
         vec3 N = estimateNormal(hitPos);
         vec3 viewDir = normalize(ro - hitPos);
         vec3 color = phongLighting(hitPos, N, viewDir);
-        fragColor = vec4(toneMap(color), 1.0);
+        fragColor = vec4(color, 1.0);
 
     } else {
         fragColor = vec4(0.0, 0.0, 0.0, 1.0);
